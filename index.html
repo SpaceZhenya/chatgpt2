@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>ИИ-чат (Gemini 2.5 Flash)</title>
+  <title>ИИ-чат (с памятью)</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f9; }
     #chat { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; background: white; }
@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h2>ИИ-чат (Gemini 2.5 Flash)</h2>
+  <h2>ИИ-чат (Gemini 2.5 Flash + память)</h2>
   <div id="chat"></div>
   <input id="input" type="text" placeholder="Напиши сообщение..." style="width:80%">
   <button onclick="sendMessage()">Отправить</button>
@@ -21,6 +21,9 @@
     const chat = document.getElementById('chat');
     const API_KEY = "AIzaSyCPJwayDaH4Lrb0fw8MypQYHP3xdr2KA9I"; // вставь свой ключ Gemini
     const MODEL = "gemini-2.5-flash";
+
+    // История чата
+    const history = [];
 
     function addMessage(sender, text) {
       const div = document.createElement('div');
@@ -35,6 +38,9 @@
       const text = input.value.trim();
       if (!text) return;
       addMessage('user', text);
+
+      // сохраняем сообщение в историю
+      history.push({ role: "user", parts: [{ text }] });
       input.value = '';
 
       addMessage('bot', "Думаю...");
@@ -48,9 +54,7 @@
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              contents: [
-                { role: "user", parts: [{ text }] }
-              ]
+              contents: history
             })
           }
         );
@@ -59,7 +63,12 @@
         console.log(data);
 
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Не понял 🤔";
+
+        // заменяем последний "думаю..." на реальный ответ
         chat.lastChild.textContent = "BOT: " + reply;
+
+        // сохраняем ответ в историю
+        history.push({ role: "model", parts: [{ text: reply }] });
 
       } catch (err) {
         chat.lastChild.textContent = "BOT: Ошибка (" + err.message + ")";
