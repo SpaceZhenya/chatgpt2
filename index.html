@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>ИИ-чат с голосом</title>
+  <title>ИИ-чат с кнопкой голоса</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f9; }
     #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; background: white; }
@@ -13,21 +13,22 @@
   </style>
 </head>
 <body>
-<h2>ИИ-чат (Gemini 2.5 Flash + голос)</h2>
+<h2>ИИ-чат (Gemini 2.5 Flash + голос по кнопке)</h2>
 <div id="chat"></div>
 
 <div id="controls">
-  <input id="input" type="text" placeholder="Напиши сообщение..." style="width:60%">
-  <button onclick="sendMessage()">Отправить</button>
+  <input id="input" type="text" placeholder="Напиши сообщение..." style="width:50%">
+  <button onclick="sendMessage(false)">Отправить</button>
   <button onclick="startListening()">🎤 Говорить</button>
   <button onclick="resetChat()">Сбросить</button>
   <button onclick="saveChat()">💾 Сохранить</button>
+  <button onclick="sendMessage(true)">🎙 Голос ИИ</button>
 </div>
 
 <script>
 const chat = document.getElementById('chat');
 const input = document.getElementById('input');
-const API_KEY = "AIzaSyCPJwayDaH4Lrb0fw8MypQYHP3xdr2KA9I"; // вставь свой ключ Gemini
+const API_KEY = "AIzaSyCPJwayDaH4Lrb0fw8MypQYHP3xdr2KA9I";
 const MODEL = "gemini-2.5-flash";
 let history = [];
 
@@ -64,8 +65,8 @@ function saveChat() {
   URL.revokeObjectURL(url);
 }
 
-// Отправка текста в чат
-async function sendMessage() {
+// Отправка сообщения
+async function sendMessage(speak = false) {
   const text = input.value.trim();
   if (!text) return;
 
@@ -92,17 +93,19 @@ async function sendMessage() {
     addMessage("bot", reply);
     history.push({ role: "model", parts: [{ text: reply }] });
 
-    // озвучка ответа
-    const utterance = new SpeechSynthesisUtterance(reply);
-    utterance.lang = "ru-RU";
-    speechSynthesis.speak(utterance);
+    // если включён параметр speak, озвучиваем ответ
+    if (speak) {
+      const utterance = new SpeechSynthesisUtterance(reply);
+      utterance.lang = "ru-RU";
+      speechSynthesis.speak(utterance);
+    }
 
   } catch (err) {
     botDiv.textContent = "BOT: Ошибка (" + err.message + ")";
   }
 }
 
-// Голосовой ввод
+// Голосовой ввод пользователя
 function startListening() {
   const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
   recognition.lang = 'ru-RU';
@@ -113,15 +116,15 @@ function startListening() {
   recognition.onresult = (event) => {
     const speech = event.results[0][0].transcript;
     input.value = speech;
-    sendMessage();
+    sendMessage(false); // пользовательский голос → бот без озвучки
   };
 }
 
 // Отправка по Enter
-input.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
+input.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(false); });
 
 // Приветствие
-addMessage("bot", "Привет! Я Gemini 2.5 Flash. Можешь писать или говорить сообщения.");
+addMessage("bot", "Привет! Я Gemini 2.5 Flash. Можешь писать или говорить сообщения. Голос ИИ с кнопки 🎙.");
 </script>
 </body>
 </html>
