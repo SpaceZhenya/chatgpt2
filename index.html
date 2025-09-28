@@ -1,38 +1,42 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>ИИ-чат с кнопкой голоса</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f9; }
-    #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; background: white; }
-    .msg { margin: 5px 0; white-space: pre-wrap; }
-    .user { color: blue; }
-    .bot { color: green; }
-    #controls { margin-top: 10px; }
-  </style>
+<meta charset="UTF-8">
+<title>ИИ-чат с видео</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f9; }
+  #chat { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; background: white; }
+  .msg { margin: 5px 0; white-space: pre-wrap; }
+  .user { color: blue; }
+  .bot { color: green; }
+  #videoContainer { margin-top: 10px; }
+</style>
 </head>
 <body>
-<h2>ИИ-чат (Gemini 2.5 Flash + голос по кнопке)</h2>
+<h2>ИИ-чат с видео</h2>
 <div id="chat"></div>
 
 <div id="controls">
   <input id="input" type="text" placeholder="Напиши сообщение..." style="width:50%">
-  <button onclick="sendMessage(false)">Отправить</button>
-  <button onclick="startListening()">🎤 Говорить</button>
+  <button onclick="sendMessage()">Отправить</button>
+  <button onclick="startCamera()">📹 Включить видео</button>
   <button onclick="resetChat()">Сбросить</button>
   <button onclick="saveChat()">💾 Сохранить</button>
-  <button onclick="sendMessage(true)">🎙 Голос ИИ</button>
+</div>
+
+<div id="videoContainer">
+  <video id="video" width="320" height="240" autoplay muted></video>
 </div>
 
 <script>
 const chat = document.getElementById('chat');
 const input = document.getElementById('input');
-const API_KEY = "AIzaSyCPJwayDaH4Lrb0fw8MypQYHP3xdr2KA9I";
+const video = document.getElementById('video');
+const API_KEY = "ТВОЙ_API_КЛЮЧ";
 const MODEL = "gemini-2.5-flash";
 let history = [];
 
-// Добавление сообщения в чат
+// Чат
 function addMessage(sender, text) {
   const div = document.createElement('div');
   div.className = 'msg ' + sender;
@@ -42,14 +46,12 @@ function addMessage(sender, text) {
   return div;
 }
 
-// Сброс чата
 function resetChat() {
   history = [];
   chat.innerHTML = "";
   addMessage("bot", "Чат очищен. Начнём заново!");
 }
 
-// Сохранение истории
 function saveChat() {
   let text = "";
   history.forEach(m => {
@@ -66,13 +68,12 @@ function saveChat() {
 }
 
 // Отправка сообщения
-async function sendMessage(speak = false) {
+async function sendMessage() {
   const text = input.value.trim();
-  if (!text) return;
-
+  if(!text) return;
   addMessage('user', text);
-  history.push({ role: "user", parts: [{ text }] });
-  input.value = '';
+  history.push({ role:"user", parts:[{text}] });
+  input.value='';
 
   const botDiv = addMessage('bot', "Думаю...");
 
@@ -88,43 +89,31 @@ async function sendMessage(speak = false) {
 
     const data = await response.json();
     const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Не понял 🤔";
-
     botDiv.textContent = "";
     addMessage("bot", reply);
-    history.push({ role: "model", parts: [{ text: reply }] });
+    history.push({ role:"model", parts:[{text: reply}] });
 
-    // если включён параметр speak, озвучиваем ответ
-    if (speak) {
-      const utterance = new SpeechSynthesisUtterance(reply);
-      utterance.lang = "ru-RU";
-      speechSynthesis.speak(utterance);
-    }
-
-  } catch (err) {
+  } catch(err) {
     botDiv.textContent = "BOT: Ошибка (" + err.message + ")";
   }
 }
 
-// Голосовой ввод пользователя
-function startListening() {
-  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-  recognition.lang = 'ru-RU';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
-  recognition.start();
-  recognition.onresult = (event) => {
-    const speech = event.results[0][0].transcript;
-    input.value = speech;
-    sendMessage(false); // пользовательский голос → бот без озвучки
-  };
+// Включение камеры
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+    video.srcObject = stream;
+    addMessage("bot", "Видео включено. Теперь можешь говорить о происходящем.");
+    // Здесь можно добавить отправку кадров на API для анализа
+  } catch(err) {
+    addMessage("bot", "Ошибка при включении камеры: " + err.message);
+  }
 }
 
-// Отправка по Enter
-input.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(false); });
+input.addEventListener("keydown", e => { if(e.key==="Enter") sendMessage(); });
 
 // Приветствие
-addMessage("bot", "Привет! Я Gemini 2.5 Flash. Можешь писать или говорить сообщения. Голос ИИ с кнопки 🎙.");
+addMessage("bot", "Привет! Нажми 📹 чтобы включить видео и говори с ИИ о происходящем.");
 </script>
 </body>
 </html>
