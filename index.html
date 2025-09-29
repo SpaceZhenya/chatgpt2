@@ -10,9 +10,9 @@
   .msg { margin: 5px 0; white-space: pre-wrap; display:flex; align-items:center; }
   .user { color: blue; justify-content: flex-start; }
   .bot { color: green; justify-content: flex-start; }
-  .penguin { width:30px; height:30px; margin-right:5px; }
+  .penguin { font-size: 50px; margin-right:10px; display:inline-block; }
   @keyframes wave { 0% {transform: rotate(0deg);} 25% {transform: rotate(15deg);} 50% {transform: rotate(0deg);} 75% {transform: rotate(-15deg);} 100% {transform: rotate(0deg);} }
-  .wave { animation: wave 0.5s ease-in-out 2; transform-origin: bottom center; display:inline-block; }
+  .wave { animation: wave 0.5s ease-in-out infinite; transform-origin: bottom center; display:inline-block; }
   #controls { margin-top: 10px; }
 </style>
 </head>
@@ -53,13 +53,11 @@ function addMessage(sender, text) {
   div.className = 'msg ' + sender;
   
   if(sender === 'bot') {
-    // Пингвин с анимацией при сообщении бота
+    // Пингвин
     const penguin = document.createElement('span');
-    penguin.className = 'penguin wave';
+    penguin.className = 'penguin';
     penguin.textContent = '🐧';
     div.appendChild(penguin);
-  } else {
-    div.style.justifyContent = "flex-start";
   }
   
   const span = document.createElement('span');
@@ -68,15 +66,18 @@ function addMessage(sender, text) {
   
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
+  
   return div;
 }
 
+// Сброс чата
 function resetChat() {
   history = [];
   chat.innerHTML = "";
   addMessage("bot", "Привет! Я Pingvi 🐧. Давай поговорим!");
 }
 
+// Сохранение истории
 function saveChat() {
   let text = "";
   history.forEach(m => {
@@ -92,6 +93,7 @@ function saveChat() {
   URL.revokeObjectURL(url);
 }
 
+// Отправка сообщения
 async function sendMessage() {
   const text = input.value.trim();
   if(!text) return;
@@ -101,6 +103,8 @@ async function sendMessage() {
   input.value='';
 
   const botDiv = addMessage('bot', "Pingvi думает...");
+  const penguin = botDiv.querySelector('.penguin');
+  if(penguin) penguin.classList.add('wave'); // начинаем махать крылом
 
   try {
     const response = await fetch(
@@ -119,10 +123,21 @@ async function sendMessage() {
     addMessage("bot", reply);
     history.push({ role:"model", parts:[{text:reply}] });
 
-    // Голос ИИ всегда включён, регулируется громкость
+    // Голос ИИ
     const utterance = new SpeechSynthesisUtterance(reply);
     utterance.lang="ru-RU";
     utterance.volume = volume;
+
+    // Во время речи пингвин машет
+    utterance.onstart = () => {
+      const lastBot = chat.lastChild.querySelector('.penguin');
+      if(lastBot) lastBot.classList.add('wave');
+    };
+    utterance.onend = () => {
+      const lastBot = chat.lastChild.querySelector('.penguin');
+      if(lastBot) lastBot.classList.remove('wave');
+    };
+
     speechSynthesis.speak(utterance);
 
   } catch(err) {
@@ -130,6 +145,7 @@ async function sendMessage() {
   }
 }
 
+// Голосовой ввод пользователя
 function startListening() {
   recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
   recognition.lang='ru-RU';
@@ -150,6 +166,7 @@ function startListening() {
   };
 }
 
+// Отправка по Enter
 input.addEventListener("keydown", e=>{ if(e.key==="Enter") sendMessage(); });
 
 // Стартовое приветствие
