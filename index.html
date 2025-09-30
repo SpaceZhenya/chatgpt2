@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Pingvi v7 🐧 Певец</title>
+<title>Pingvi v5 🐧</title>
 <style>
   body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f9; }
   h2 { display:flex; align-items:center; }
@@ -10,21 +10,25 @@
   .msg { margin: 10px 0; display:flex; align-items:flex-start; }
   .user { color: blue; }
   .bot { color: green; }
-  .penguin { font-size: 50px; margin-right:10px; transition: transform 0.3s; }
-  .wave { transform: rotate(20deg); }
+  .penguin { font-size: 50px; margin-right:10px; }
   .text { max-width: 80%; }
   #controls { margin-top: 10px; }
+  .markdown p { margin: 5px 0; }
+  .markdown code { background:#eee; padding:2px 4px; border-radius:4px; }
+  .markdown pre { background:#eee; padding:8px; border-radius:8px; overflow-x:auto; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-<h2>Pingvi v7 🐧 Певец</h2>
+<h2>Pingvi v5 🐧</h2>
 <div id="chat"></div>
 
 <div id="controls">
   <input id="input" type="text" placeholder="Напиши сообщение..." style="width:50%">
   <button onclick="sendMessage()">Отправить</button>
+  <button onclick="startListening()">🎤 Голос пользователя</button>
   <button onclick="resetChat()">Сбросить</button>
+  <button onclick="saveChat()">💾 Сохранить</button>
   <br><br>
   <label>Режим Pingvi:</label>
   <select id="modeSelect">
@@ -38,11 +42,16 @@
     <option value="gamer">Геймер 🎮</option>
     <option value="scientist">Учёный 🔬</option>
     <option value="chef">Шеф-повар 👨‍🍳</option>
-    <option value="singer">Певец 🎤</option>
   </select>
   <br><br>
-  <label>Громкость голоса: <span id="volLabel">50</span>%</label>
+  <label>Громкость: <span id="volLabel">50</span>%</label>
   <input type="range" id="volumeSlider" min="0" max="100" value="50">
+  <br><br>
+  <label>Голос Pingvi:</label>
+  <select id="voiceSelect"></select>
+  <br><br>
+  <label>Загрузить картинку:</label>
+  <input type="file" id="imageUpload" accept="image/*">
 </div>
 
 <script>
@@ -50,18 +59,35 @@ const chat = document.getElementById('chat');
 const input = document.getElementById('input');
 const volumeSlider = document.getElementById('volumeSlider');
 const volLabel = document.getElementById('volLabel');
+const voiceSelect = document.getElementById('voiceSelect');
+const imageUpload = document.getElementById('imageUpload');
 const modeSelect = document.getElementById('modeSelect');
 
 const API_KEY = "AIzaSyCPJwayDaH4Lrb0fw8MypQYHP3xdr2KA9I";
 const MODEL = "gemini-2.5-flash";
 let history = [];
+let recognition = null;
 let volume = 0.5;
+let voices = [];
 
 // Настройка громкости
 volumeSlider.addEventListener('input', () => {
   volume = volumeSlider.value / 100;
   volLabel.textContent = volumeSlider.value;
 });
+
+// Загрузка голосов
+function loadVoices() {
+  voices = speechSynthesis.getVoices();
+  voiceSelect.innerHTML = "";
+  voices.forEach((v, i) => {
+    const option = document.createElement("option");
+    option.value = i;
+    option.textContent = `${v.name} (${v.lang})`;
+    voiceSelect.appendChild(option);
+  });
+}
+speechSynthesis.onvoiceschanged = loadVoices;
 
 // Добавление сообщения
 function addMessage(sender, text, markdown=false) {
@@ -73,8 +99,6 @@ function addMessage(sender, text, markdown=false) {
     penguin.className = 'penguin';
     penguin.textContent = '🐧';
     div.appendChild(penguin);
-    penguin.classList.add('wave');
-    setTimeout(()=>penguin.classList.remove('wave'),500);
   }
 
   const span = document.createElement('div');
@@ -94,56 +118,67 @@ function resetChat() {
   addMessage("bot", "Привет! Я Pingvi 🐧. Давай поговорим!", true);
 }
 
+// Сохранение истории
+function saveChat() {
+  let text = "";
+  history.forEach(m => {
+    const role = m.role === "user" ? "Ты" : "Pingvi";
+    text += `${role}: ${m.parts[0].text}\n`;
+  });
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "chat_history.txt";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // Получаем инструкцию по режиму
 function getSystemInstruction() {
   switch(modeSelect.value) {
-    case "joke": return "Отвечай весело, шути, используй смайлы.";
-    case "teacher": return "Объясняй понятно и пошагово, задавай вопросы.";
-    case "philosopher": return "Отвечай глубоко и мудро.";
-    case "motivator": return "Будь мотиватором: вдохновляй и поддерживай.";
-    case "historian": return "Рассказывай как историк с фактами и датами.";
-    case "poet": return "Отвечай красиво, стихами или поэтично.";
-    case "gamer": return "Говори как геймер, используй игровой сленг.";
-    case "scientist": return "Отвечай как учёный, точно и с терминами.";
-    case "chef": return "Давай советы и рецепты как шеф-повар.";
-    case "singer": return "Отвечай как певец, создавай текст песен и мелодичные строки.";
-    default: return "Отвечай спокойно и полезно.";
+    case "joke": return "Отвечай весело, шути, используй смайлы, будь забавным пингвином.";
+    case "teacher": return "Объясняй как учитель: понятно, пошагово, задавай вопросы ученику.";
+    case "philosopher": return "Отвечай мудро, глубоко, используй философские рассуждения.";
+    case "motivator": return "Будь мотиватором: вдохновляй, поддерживай, говори с энергией.";
+    case "historian": return "Отвечай как историк: подробно, с фактами и датами, описывай события точно.";
+    case "poet": return "Отвечай стихами или красиво оформленными фразами, как поэт.";
+    case "gamer": return "Отвечай как геймер: используй сленг и игровые термины.";
+    case "scientist": return "Отвечай как учёный: точно, с терминами и фактами, как исследователь.";
+    case "chef": return "Отвечай как шеф-повар: давай советы и рецепты, объясняй процесс готовки.";
+    default: return "Отвечай спокойно и полезно, как обычный помощник.";
   }
 }
 
-// Функция «пение» текста
-function singText(text) {
-  const lines = text.split("\n");
-  lines.forEach((line, index) => {
-    const utterance = new SpeechSynthesisUtterance(line);
-    utterance.lang = "ru-RU";
-    utterance.volume = volume;
-    utterance.rate = 1 + Math.random()*0.2;
-    utterance.pitch = 1 + Math.random()*0.5;
-    setTimeout(() => speechSynthesis.speak(utterance), index * 1200);
-  });
-}
-
 // Отправка сообщения
-async function sendMessage() {
+async function sendMessage(imageData=null) {
   const text = input.value.trim();
-  if(!text) return;
+  if(!text && !imageData) return;
 
-  addMessage('user', text);
-  history.push({ role:"user", parts:[{text}] });
+  if(text) {
+    addMessage('user', text);
+    history.push({ role:"user", parts:[{text}] });
+  }
   input.value='';
 
   const botDiv = addMessage('bot', "Pingvi думает...");
 
   try {
-    const body = {
-      contents: history,
-      systemInstruction: { parts:[{text:getSystemInstruction()}] }
-    };
+    let body = { contents: history };
+    if(imageData) {
+      history.push({ role:"user", parts:[{ text: "Что изображено на картинке?" }, { inlineData: { mimeType: "image/png", data: imageData } }] });
+      body = { contents: history };
+    }
+
+    body.systemInstruction = { parts: [{ text: getSystemInstruction() }] };
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`,
-      { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      }
     );
 
     const data = await response.json();
@@ -153,26 +188,59 @@ async function sendMessage() {
     addMessage("bot", reply, true);
     history.push({ role:"model", parts:[{text:reply}] });
 
-    // Если режим «Певец», используем singText
-    if(modeSelect.value==="singer") {
-      singText(reply);
-    } else {
-      const utterance = new SpeechSynthesisUtterance(reply);
-      utterance.lang="ru-RU";
-      utterance.volume = volume;
-      speechSynthesis.speak(utterance);
+    // Озвучка
+    const utterance = new SpeechSynthesisUtterance(reply);
+    utterance.lang="ru-RU";
+    utterance.volume = volume;
+    if(voices.length > 0) {
+      utterance.voice = voices[voiceSelect.value] || voices[0];
     }
+    speechSynthesis.speak(utterance);
 
   } catch(err) {
     botDiv.textContent = "Pingvi: Ошибка ("+err.message+")";
   }
 }
 
+// Голосовой ввод
+function startListening() {
+  recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  recognition.lang='ru-RU';
+  recognition.interimResults=false;
+  recognition.maxAlternatives=1;
+
+  recognition.start();
+  recognition.onresult = (event) => {
+    const speech = event.results[0][0].transcript;
+    input.value = speech;
+    sendMessage();
+    recognition.start();
+  };
+
+  recognition.onerror = (event) => {
+    console.error("Speech recognition error", event);
+    recognition.stop();
+  };
+}
+
+// Загрузка картинки
+imageUpload.addEventListener("change", () => {
+  const file = imageUpload.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const base64 = reader.result.split(",")[1];
+    sendMessage(base64);
+  };
+  reader.readAsDataURL(file);
+});
+
 // Enter для отправки
 input.addEventListener("keydown", e=>{ if(e.key==="Enter") sendMessage(); });
 
 // Стартовое приветствие
 resetChat();
+loadVoices();
 </script>
 </body>
 </html>
